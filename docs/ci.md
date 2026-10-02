@@ -36,6 +36,8 @@ upstream authorship. The mirror is only a cross-check; CI still builds the offic
 and Apache Ant **1.10.15**. Ant is downloaded over HTTPS and checked against its
 committed SHA-512 before extraction or execution. The preparation script verifies
 the JDK vendor, complete runtime version (including build number), and Ant version.
+The JDK lock also records Adoptium's SemVer alias used by `setup-java`; the runtime
+check still requires `17.0.20.1+1` exactly.
 
 On the first cache miss, CI installs SVN and the pinned Ant, exports and verifies the pinned sources, runs the
 official build, and retains only the six JARs used to compile our adapter. A

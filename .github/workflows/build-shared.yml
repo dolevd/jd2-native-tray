@@ -37,7 +37,9 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               for name, value in {
                   'java-distribution': pins['java']['distribution'],
-                  'java-version': pins['java']['version'],
+                  # Adoptium represents this four-component respin as SemVer 17.0.20+101.
+                  # prepare_jd2.py separately verifies the full actual runtime version.
+                  'java-version': pins['java']['setup_version'],
                   'ant-version': pins['ant']['version'],
                   'ant-url': pins['ant']['url'],
                   'ant-sha512': pins['ant']['sha512'],
