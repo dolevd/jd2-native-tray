@@ -1,0 +1,21 @@
+# Local dependencies, fixtures, and investigation files
+/.local-build/
+/work/
+/.m2/
+
+# Maven output and temporary directories
+/target/
+/tmp/
+/temp/
+
+# Generated Java and Python files
+*.class
+*.jar
+__pycache__/
+*.py[cod]
+
+# Logs and editor temporary files
+*.log
+*.tmp
+*.swp
+*~
