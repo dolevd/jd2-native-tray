@@ -27,6 +27,8 @@ class CacheTest(unittest.TestCase):
         self.lock = self.root / 'ci/jd2-sources.json'
         self.lock.parent.mkdir()
         shutil.copyfile(PROJECT / 'ci/jd2-sources.json', self.lock)
+        self.toolchain = self.lock.with_name('jd2-toolchain.json')
+        shutil.copyfile(PROJECT / 'ci/jd2-toolchain.json', self.toolchain)
         self.sdk = self.root / '.local-build/ci/jd2'
         for relative in JARS:
             path = self.sdk / relative
@@ -34,7 +36,8 @@ class CacheTest(unittest.TestCase):
             with zipfile.ZipFile(path, 'w') as archive:
                 archive.writestr('fixture.txt', relative)
         manifest = {
-            'fingerprint': hashlib.sha256(self.lock.read_bytes() + self.script.read_bytes()).hexdigest(),
+            'fingerprint': hashlib.sha256(self.lock.read_bytes() + self.toolchain.read_bytes() + self.script.read_bytes()).hexdigest(),
+            'toolchain': json.loads(self.toolchain.read_text()),
             'jars': {name: hashlib.sha256((self.sdk / name).read_bytes()).hexdigest() for name in JARS},
         }
         (self.sdk / 'native-tray-sdk.json').write_text(json.dumps(manifest))
@@ -62,6 +65,18 @@ class CacheTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn('invalid JD2 cache', result.stderr)
         self.assertEqual(b'damaged artifact', path.read_bytes())
+
+    def test_java_patch_change_rejects_previous_cache(self):
+        pins = json.loads(self.toolchain.read_text())
+        pins['java']['version'] = '17.0.20.1+2'
+        self.toolchain.write_text(json.dumps(pins))
+        self.assertNotEqual(0, self.run_script('--check').returncode)
+
+    def test_ant_change_rejects_previous_cache(self):
+        pins = json.loads(self.toolchain.read_text())
+        pins['ant']['version'] = '1.10.16'
+        self.toolchain.write_text(json.dumps(pins))
+        self.assertNotEqual(0, self.run_script('--check').returncode)
 
     def test_missing_jar_fails_verification(self):
         (self.sdk / 'libs/JDGUI.jar').unlink()

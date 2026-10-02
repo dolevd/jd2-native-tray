@@ -17,13 +17,30 @@ headless; desktop sessions and the JD2 GUI are not started.
 JD2 is built using its [official standalone Ant build](https://support.jdownloader.org/en/knowledgebase/article/self-compiled-standalone-build).
 [ci/jd2-sources.json](../ci/jd2-sources.json) pins all four SVN projects, including
 AppWorkUtils. Both the operative revision and peg revision are fixed; no checkout
-uses the current HEAD. No JD2 installer, updater, Flatpak or graphical application
+uses the current HEAD. Each export must also match its committed `tree_sha256`
+before any exported Ant build instructions are executed. The digest covers every
+file's content, relative path and executable flag, plus directories. Symlinks and
+other special entries are rejected, and SVN externals are not fetched. No JD2 installer, updater, Flatpak or graphical application
 is run on the build worker.
 
-On the first cache miss, CI installs SVN/Ant, exports the pinned sources, runs the
+The official documented SVN URLs use unauthenticated `svn://`; their HTTPS
+endpoints do not provide working anonymous access. Content pins in the reviewed
+Git checkout provide the trust anchor: CI never obtains expected hashes from SVN
+or updates them to accept downloaded content. The initial pins were established
+from the fixed-revision exports, with build scripts and bundled libraries
+cross-checked against the [HTTPS community mirror at a fixed commit](https://github.com/mycodedoesnotcompile2/jdownloader_mirror/tree/7aec0cddff4f87089a287db02f17a935beeded55).
+This establishes a fixed baseline, not an upstream signature or a guarantee of
+upstream authorship. The mirror is only a cross-check; CI still builds the official exports.
+
+[ci/jd2-toolchain.json](../ci/jd2-toolchain.json) pins Temurin **17.0.20.1+1**
+and Apache Ant **1.10.15**. Ant is downloaded over HTTPS and checked against its
+committed SHA-512 before extraction or execution. The preparation script verifies
+the JDK vendor, complete runtime version (including build number), and Ant version.
+
+On the first cache miss, CI installs SVN and the pinned Ant, exports and verifies the pinned sources, runs the
 official build, and retains only the six JARs used to compile our adapter. A
-manifest records their checksums and source revisions. The cache key includes the
-runner OS/architecture, Java major version, source-lock file and preparation
+manifest records their checksums, source revisions and toolchain pins. The cache key includes the
+runner OS/architecture, complete source and toolchain lock files, and preparation
 script. Exact cache hits verify and reuse those JARs without exporting or building
 JD2. There is no fallback to another revision. Cache saving happens before our
 extension tests, so a failing extension build does not discard a successful JD2 build.
@@ -34,11 +51,16 @@ but their own caches cannot replace it. GitHub can also
 An evicted/deleted cache must be rebuilt. Cache corruption fails verification;
 delete that cache in **Actions → Caches** and rerun.
 
-To update JD2, change the SVN revision numbers in the lock file together and open
-a PR. The changed lock automatically selects a new cache key. Test the resulting
+To update JD2, review the new exports against an independently trusted source,
+then change the SVN revisions and corresponding tree digests in the lock file
+together and open a PR. Do not automatically accept a hash from an unverified
+SVN response. The canonical digest can be calculated with `tree_sha256` in
+`scripts/ci/prepare_jd2.py`. Toolchain updates likewise require changes to their
+lock file, including Ant's archive hash. Either changed lock selects a new cache key. Test the resulting
 extension in the distributed JD2 application before publishing a release.
 
-To use the same source build locally, install SVN, Ant and JDK 17, then run:
+To use the same source build locally, install SVN, Python 3.11 or later, and the
+exact Temurin and Ant versions in the toolchain lock (with both tools on `PATH`), then run:
 
 ```sh
 python3 scripts/ci/prepare_jd2.py

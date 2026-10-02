@@ -28,22 +28,52 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
+      - name: Read pinned build toolchain
+        id: toolchain
+        run: |
+          python3 - <<'PY'
+          import json, os
+          pins = json.load(open('ci/jd2-toolchain.json'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for name, value in {
+                  'java-distribution': pins['java']['distribution'],
+                  'java-version': pins['java']['version'],
+                  'ant-version': pins['ant']['version'],
+                  'ant-url': pins['ant']['url'],
+                  'ant-sha512': pins['ant']['sha512'],
+              }.items():
+                  print(f'{name}={value}', file=output)
+          PY
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
-          distribution: temurin
-          java-version: '17'
+          distribution: ${{ steps.toolchain.outputs.java-distribution }}
+          java-version: ${{ steps.toolchain.outputs.java-version }}
           cache: maven
       - name: Restore the exact pinned JD2 SDK
         id: sdk-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .local-build/ci/jd2
-          key: jd2-sdk-${{ runner.os }}-${{ runner.arch }}-jdk17-${{ hashFiles('ci/jd2-sources.json', 'scripts/ci/prepare_jd2.py') }}
+          key: jd2-sdk-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('ci/jd2-sources.json', 'ci/jd2-toolchain.json', 'scripts/ci/prepare_jd2.py') }}
       - name: Install source-build tools on a cache miss
         if: steps.sdk-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y ant subversion
+          sudo apt-get install --no-install-recommends -y subversion
+      - name: Install the verified pinned Ant on a cache miss
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        env:
+          ANT_VERSION: ${{ steps.toolchain.outputs.ant-version }}
+          ANT_URL: ${{ steps.toolchain.outputs.ant-url }}
+          ANT_SHA512: ${{ steps.toolchain.outputs.ant-sha512 }}
+        run: |
+          mkdir -p .local-build/ci/tools
+          curl --proto '=https' --proto-redir '=https' --fail --location --retry 3 --max-time 180 \
+            "$ANT_URL" -o .local-build/ci/tools/ant.tar.gz
+          printf '%s  %s\n' "$ANT_SHA512" '.local-build/ci/tools/ant.tar.gz' | sha512sum --check
+          tar -xzf .local-build/ci/tools/ant.tar.gz -C .local-build/ci/tools
+          echo "$GITHUB_WORKSPACE/.local-build/ci/tools/apache-ant-$ANT_VERSION/bin" >> "$GITHUB_PATH"
+          echo "ANT_HOME=$GITHUB_WORKSPACE/.local-build/ci/tools/apache-ant-$ANT_VERSION" >> "$GITHUB_ENV"
       - name: Build the pinned official JD2 sources on a cache miss
         if: steps.sdk-cache.outputs.cache-hit != 'true'
         run: python3 scripts/ci/prepare_jd2.py

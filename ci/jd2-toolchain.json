@@ -1,0 +1,8 @@
+{
+  "java": {"distribution": "temurin", "vendor": "Eclipse Adoptium", "version": "17.0.20.1+1"},
+  "ant": {
+    "version": "1.10.15",
+    "url": "https://archive.apache.org/dist/ant/binaries/apache-ant-1.10.15-bin.tar.gz",
+    "sha512": "d78427aff207592c024ff1552dc04f7b57065a195c42d398fcffe7a0145e8d00cd46786f5aa52e77ab0fdf81334f065eb8011eecd2b48f7228e97ff4cb20d16c"
+  }
+}
