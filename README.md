@@ -1,10 +1,10 @@
 # JD2 Native Tray
 
-A JDownloader 2 application extension that exports a native StatusNotifierItem and dbusmenu on the session bus. Plasma renders the icon and popup menu. It runs in JD2's JVM; no external agent or service is needed, and no JD2 core JAR is patched.
+A JDownloader 2 application extension that exports a native StatusNotifierItem and dbusmenu on the session bus. KDE Plasma renders the icon and popup menu. The JD2 adapter currently supports KDE Plasma on Linux (Wayland or X11). It runs in JD2's JVM; no external agent or service is needed, and no JD2 core JAR is patched.
 
 ## Install and test
 
-Build the extension first using the [build instructions](#build) below. The built JAR is `target/NativeTray.jar`.
+Build the extension first using the [build instructions](#build) below. The built JAR is `jd2-adapter/target/NativeTray.jar`.
 
 1. Quit JD2 with **File → Exit**. Closing the main window may only minimize it.
 2. Run from this directory:
@@ -53,11 +53,43 @@ Requires Maven and JDK 17 or newer. Compile against the installed JD2 JARs:
 
 The build caches Maven dependencies under `.local-build/m2`. JD2 JARs copied to `.local-build/provided` are build inputs only; they are excluded from the distributable. The output bundles and relocates dbus-java 5.2.2, its Java Unix-domain-socket transport and SLF4J. The native transport needs no helper process or native binary. The optional XWayland focus-token bridge uses the JNA already supplied by JD2.
 
+## Supported environments
+
+The JD2 adapter supports **Linux with KDE Plasma**, on Wayland and X11. StatusNotifierItem is implemented by other desktops, but some hosts cannot display pixmap icons and their input/menu behavior has not been validated here. The independent `tray-core` library has no KDE restriction.
+
+On unsupported desktops, headless processes, or Flatpaks without native tray permission, the extension remains disabled. Its settings page explains the problem without offering an enable checkbox. Attempts to enable it elsewhere in JD2 are also rejected, including direct Advanced Settings writes and previously saved enable flags when starting outside Plasma. JD2's existing tray and window settings are not changed on rejection.
+
+Detection uses inherited desktop/session variables and, inside Flatpak, the effective permissions in `/.flatpak-info`. It does not inspect host processes, assume that a service named `org.kde.StatusNotifierWatcher` proves KDE is running, or request access to Plasma's private bus names. If desktop identity is unavailable, activation is refused with an explanation. Start JD2 from your Plasma session so its environment is inherited.
+
+A supported Plasma session can temporarily lack a tray host during startup or shell restart. The D-Bus worker checks the watcher and its `IsStatusNotifierHostRegistered` property before enabling window hiding. Until registration succeeds, the status explains that the native tray is unavailable and JD2's original tray remains in place. Recovery is automatic. A Flatpak needs `--talk-name=org.kde.StatusNotifierWatcher`; the supplied installer grants that narrow permission.
+
+## Reusable library and JD2 adapter
+
+This is a Maven project with two modules:
+
+| Module | Responsibility | Output |
+| --- | --- | --- |
+| `tray-core` | StatusNotifierItem, dbusmenu, bus registration/recovery, transparent pixmaps and activation policy. Depends on dbus-java and SLF4J, with no JD2, AppWork or JNA dependency. | `tray-core/target/tray-core-0.1.0.jar` |
+| `jd2-adapter` | JD2 settings, supported-desktop policy, menu conversion, clipboard badge, window lifecycle and optional XWayland activation bridge. | `jd2-adapter/target/NativeTray.jar` |
+
+The installable JD2 JAR includes the core and relocates its D-Bus/SLF4J dependencies. The ordinary core JAR retains normal dependency namespaces so other Maven applications can use it. See [tray-core's API and example](tray-core/README.md).
+
+Build or install only the reusable library, without any JD2 installation:
+
+```sh
+mvn -f tray-core/pom.xml -Dmaven.repo.local="$PWD/.local-build/m2" package
+# Use this to make its Maven coordinates available to another local project:
+mvn -N -Dmaven.repo.local="$PWD/.local-build/m2" install
+mvn -f tray-core/pom.xml -Dmaven.repo.local="$PWD/.local-build/m2" install
+```
+
+The JD2 extension class and configuration namespace remain `org.jdownloader.extensions.nativetray.NativeTrayExtension`, so existing settings and installer backups remain usable.
+
 ## Architecture and compatibility
 
 - The public `AbstractExtension` lifecycle, normal config storage, JD Swing settings widgets, shared password keys and `MenuManagerTrayIcon` menu model form the JD2 adapter. JD2 APIs are not a versioned third-party SDK, so a future JD2 update could require rebuilding this small adapter.
 - The transport exposes `org.kde.StatusNotifierItem`, `org.freedesktop.DBus.Properties`, and `com.canonical.dbusmenu`. Bus wire names survive Java package relocation. Explicit multi-value reply serialization avoids ambiguity in dbus-java's tuple introspection.
-- Each enable owns a private connection and a name beneath `org.jdownloader.JDownloader.NativeTray`. Flatpak already permits ownership of that application namespace. Registration waits until both a watcher and a tray host exist. Owner changes trigger re-registration; periodic checks also cover tray-host disappearance while the watcher remains alive.
+- Each enable owns a private connection and a unique name beneath `org.jdownloader.JDownloader.NativeTray` (or the current Flatpak application namespace). Flatpak already permits ownership of that application namespace. Registration waits until both a watcher and a tray host exist. Owner changes trigger re-registration; periodic checks also cover tray-host disappearance while the watcher remains alive.
 - Minimize/close handlers are attached only after registration. Hiding does not call `JDGui.setWindowToTray(true)`, which would restart JD2's legacy AWT recovery checker. Losing the bus or tray host restores a hidden window, or gives a protected window a minimized taskbar entry. With no native host, Hide to Tray falls back to taskbar minimization.
 - GUI initialization, settings access, menu snapshots and command execution occur on the EDT. Connection setup, bus calls and signals use a separate daemon worker with the extension class loader. Disconnecting or disabling removes the native export and callbacks.
 - Menu actions remain JD2's own customized actions, including enabled and checked state. Toggle commands execute through a Swing menu item to retain JD2's Action semantics. dbusmenu cannot embed arbitrary Swing components; number editors open the existing widget in a dialog.
@@ -65,7 +97,7 @@ The build caches Maven dependencies under `.local-build/m2`. JD2 JARs copied to 
 
 ## Verification
 
-Automated checks cover ARGB byte order/transparency, grey rendering, click-pair behavior, menu recursion and enabled state, installer backups and rollback. Packaged-wire probes verify registration, properties, exact introspection, recursive dbusmenu replies, action dispatch, and watcher restart. Tests also ran with Plasma 6.7.5 and JD2's bundled Java 26 inside its Flatpak sandbox. A child-class-loader probe checks transport discovery as loaded by a plugin.
+Automated checks cover desktop/Flatpak activation policy, configurable application identities, ARGB byte order/transparency, grey rendering, click-pair behavior, menu recursion and enabled state, installer backups and rollback. Packaged-wire probes verify registration, properties, exact introspection, recursive dbusmenu replies, action dispatch, and watcher restart, missing-host and malformed-watcher recovery. Tests also ran with Plasma 6.7.5 and JD2's bundled Java 26 inside its Flatpak sandbox. A child-class-loader probe checks transport discovery as loaded by a plugin.
 
 The JD2 runtime probe verifies extension metadata/configuration and renders the settings panel. It also converts JD2's default customized menu; GUI-dependent actions require the full app and are left for the in-app checks above. The download application is not launched by these probes, and no download commands are executed.
 
@@ -79,15 +111,15 @@ python3 tests/installer_check.py
 Packaged bus checks (run in a normal terminal, outside an extra no-new-privileges sandbox):
 
 ```sh
-dbus-run-session -- env JD_TRAY_PRIVATE_BUS=1 java -cp target/NativeTray.jar org.jdownloader.extensions.nativetray.ProtocolProbe
-java -cp target/NativeTray.jar org.jdownloader.extensions.nativetray.ProtocolProbe --desktop
+dbus-run-session -- env JD_TRAY_PRIVATE_BUS=1 java -cp jd2-adapter/target/NativeTray.jar org.jdownloader.extensions.nativetray.ProtocolProbe
+java -cp jd2-adapter/target/NativeTray.jar org.jdownloader.extensions.nativetray.ProtocolProbe --desktop
 javac -d .local-build tests/ChildLoaderProbe.java
-java -cp .local-build ChildLoaderProbe "$PWD/target/NativeTray.jar"
+java -cp .local-build ChildLoaderProbe "$PWD/jd2-adapter/target/NativeTray.jar"
 ```
 
 These desktop probes temporarily register a test icon and exit automatically. The private-bus probe rejects accidental execution on the desktop bus unless explicitly given `--desktop`. Running `dbus-run-session` inside Codex's restricted execution context caused two SELinux transition alerts during development; running it in the normal host context passed without policy changes. The extension itself connects to the existing session bus.
 
-This is the first local test release. Protocol and loader checks have passed; interactive close/minimize/password flows still need the in-app checks above. If loading fails after a JD2 update, retain the backup and rebuild against the updated installed JARs. Native Tray diagnostics go to JD2's `NativeTrayExtension` log and appear in the settings status line.
+Protocol and loader checks have passed. After an upgrade, repeat the interactive close/minimize/password checks above. If loading fails after a JD2 update, retain the backup and rebuild against the updated installed JARs. Native Tray diagnostics go to JD2's `NativeTrayExtension` log and appear in the settings status line.
 
 ## License
 

@@ -7,16 +7,19 @@ import java.util.function.*;
 public class ChildLoaderProbe {
     public static void main(String[] args) throws Exception {
         try (URLClassLoader loader = new URLClassLoader(new URL[]{Path.of(args[0]).toUri().toURL()},ChildLoaderProbe.class.getClassLoader())) {
-            Class<?> node = loader.loadClass("org.jdownloader.extensions.nativetray.MenuNode");
+            Class<?> node = loader.loadClass("org.jdownloader.extensions.nativetray.core.MenuNode");
             Object root = node.getMethod("root",List.class).invoke(null,List.of());
-            Class<?> serviceClass = loader.loadClass("org.jdownloader.extensions.nativetray.SniService");
+            Class<?> serviceClass = loader.loadClass("org.jdownloader.extensions.nativetray.core.SniService");
             AtomicBoolean available = new AtomicBoolean();
             Consumer<Boolean> state = available::set;
             Consumer<String> diagnostic = System.out::println;
             Consumer<Boolean> activation = ignored -> {};
             Consumer<String> token = ignored -> {};
             Supplier<Object> menu = () -> root;
-            try (AutoCloseable service = (AutoCloseable)serviceClass.getConstructors()[0].newInstance(state,diagnostic,activation,token,menu)) {
+            try (AutoCloseable service = (AutoCloseable)serviceClass.getConstructors()[0].newInstance(
+                    loader.loadClass("org.jdownloader.extensions.nativetray.core.TrayIdentity")
+                        .getMethod("create",String.class,String.class,String.class)
+                        .invoke(null,System.getenv().getOrDefault("FLATPAK_ID","org.jdownloader.JDownloader") + ".NativeTray.ChildProbe", "child-probe", "Child probe"),state,diagnostic,activation,token,menu)) {
                 serviceClass.getMethod("start").invoke(service);
                 long deadline = System.nanoTime() + 15_000_000_000L;
                 while (!available.get() && System.nanoTime() < deadline) Thread.sleep(50);

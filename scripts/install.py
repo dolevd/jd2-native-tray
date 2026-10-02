@@ -48,9 +48,9 @@ def digest(data):
 
 
 def install(root, use_flatpak, dry_run):
-    artifact = PROJECT / 'target/NativeTray.jar'
+    artifact = PROJECT / 'jd2-adapter/target/NativeTray.jar'
     if not artifact.is_file():
-        raise RuntimeError('Build target/NativeTray.jar first; see README.md.')
+        raise RuntimeError('Build jd2-adapter/target/NativeTray.jar first; see README.md.')
     ensure_closed(root)
     if dry_run:
         print(f'Would back up tray files and install {artifact} into {root}/extensions/NativeTray.jar')

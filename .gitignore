@@ -4,7 +4,7 @@
 /.m2/
 
 # Maven output and temporary directories
-/target/
+target/
 /tmp/
 /temp/
 

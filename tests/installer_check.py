@@ -13,7 +13,7 @@ with tempfile.TemporaryDirectory(prefix='jdtray-install-') as name:
     tray.write_bytes(old)
     run = lambda *args: subprocess.run(['python3',str(project/'scripts/install.py'),str(root),*args],check=True,capture_output=True,text=True)
     run()
-    assert (root/'extensions/NativeTray.jar').read_bytes() == (project/'target/NativeTray.jar').read_bytes()
+    assert (root/'extensions/NativeTray.jar').read_bytes() == (project/'jd2-adapter/target/NativeTray.jar').read_bytes()
     assert (root/'tmp/invalidextensions').exists()
     native = root/'cfg/org.jdownloader.extensions.nativetray.NativeTrayExtension.json'
     assert json.loads(native.read_text())['enabled'] is False

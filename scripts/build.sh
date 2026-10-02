@@ -10,4 +10,4 @@ for jd_jar in JDUtils JDGUI jna jna_platform; do
     cp -- "$jd_dir/libs/$jd_jar.jar" "$project_dir/.local-build/provided/$jd_jar.jar"
 done
 cd -- "$project_dir"
-mvn -Dmaven.repo.local=.local-build/m2 package
+mvn -Dmaven.repo.local="$project_dir/.local-build/m2" -Djd.libs="$project_dir/.local-build/provided" package
