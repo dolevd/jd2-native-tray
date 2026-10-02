@@ -102,6 +102,14 @@ python3 tests/installer_check.py
 
 Use the same `JD2_INSTALL_DIR` override for Maven tests if needed. The installer check requires the packaged JAR and does not change your JD2 installation.
 
+## CI and releases
+
+**Actions → Build and test** builds a downloadable JAR without creating a release.
+**Actions → Release from main** builds and tests a selected `main` commit, then
+publishes it under a new version tag. Both reuse cached, pinned JD2 source-build
+dependencies and run headless checks. See [CI instructions](docs/ci.md) for cache
+behavior, local checks and release steps.
+
 ## License
 
 [AGPL-3.0-only](LICENSE). Dependencies retain their own licenses; see [third-party notices](THIRD-PARTY-NOTICES.md).

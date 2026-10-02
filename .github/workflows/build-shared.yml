@@ -1,0 +1,88 @@
+name: Shared source build
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact source commit to build
+        required: true
+        type: string
+    outputs:
+      artifact-name:
+        description: Tested extension artifact
+        value: ${{ jobs.build.outputs.artifact-name }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      JD2_INSTALL_DIR: ${{ github.workspace }}/.local-build/ci/jd2
+    outputs:
+      artifact-name: ${{ steps.artifact-name.outputs.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Restore the exact pinned JD2 SDK
+        id: sdk-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .local-build/ci/jd2
+          key: jd2-sdk-${{ runner.os }}-${{ runner.arch }}-jdk17-${{ hashFiles('ci/jd2-sources.json', 'scripts/ci/prepare_jd2.py') }}
+      - name: Install source-build tools on a cache miss
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ant subversion
+      - name: Build the pinned official JD2 sources on a cache miss
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: python3 scripts/ci/prepare_jd2.py
+      - name: Verify the restored or freshly built JD2 JARs
+        run: python3 scripts/ci/prepare_jd2.py --check
+      # Save immediately: an extension test failure must not force another JD2 build.
+      - name: Cache the pinned JD2 JARs
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .local-build/ci/jd2
+          key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
+      - name: Build extension and run unit tests
+        run: mvn --batch-mode --no-transfer-progress verify
+      - name: Test installer, cache and release guards
+        run: |
+          python3 tests/installer_check.py
+          python3 -m unittest discover -s tests -p 'test_ci_*.py'
+      - name: Test packaged D-Bus protocol and watcher recovery
+        run: bash scripts/ci/test_protocol.sh
+      - name: Prepare JAR, checksums and provenance
+        run: python3 scripts/ci/package_artifact.py
+      - name: Select artifact name
+        id: artifact-name
+        run: echo "name=native-tray-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.artifact-name.outputs.name }}
+          path: |
+            .local-build/ci/artifact/NativeTray.jar
+            .local-build/ci/artifact/SHA256SUMS
+            .local-build/ci/artifact/SourceBuild.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-test-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: '**/target/surefire-reports/'
+          if-no-files-found: ignore

@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "projects": [
+    {"directory": "AppWorkUtils", "url": "svn://svn.appwork.org/utils", "revision": 4785},
+    {"directory": "JDBrowser", "url": "svn://svn.jdownloader.org/jdownloader/browser", "revision": 53520},
+    {"directory": "JDownloader", "url": "svn://svn.jdownloader.org/jdownloader/trunk", "revision": 53520},
+    {"directory": "MyJDownloaderClient", "url": "svn://svn.jdownloader.org/jdownloader/MyJDownloaderClient", "revision": 53520}
+  ]
+}
