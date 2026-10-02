@@ -13,7 +13,8 @@ import sys
 import tempfile
 
 PROJECT = Path(__file__).resolve().parents[1]
-DEFAULT_ROOT = Path.home() / '.var/app/org.jdownloader.JDownloader/data/jdownloader'
+DEFAULT_ROOT = Path(os.environ.get('JD2_INSTALL_DIR') or
+                    Path.home() / '.var/app/org.jdownloader.JDownloader/data/jdownloader')
 APP_ID = 'org.jdownloader.JDownloader'
 TRAY_CONFIGS = ['TrayExtension.json', 'org.jdownloader.gui.jdtrayicon.TrayExtension.json']
 NATIVE_CONFIGS = ['NativeTrayExtension.json', 'org.jdownloader.extensions.nativetray.NativeTrayExtension.json']
@@ -94,7 +95,7 @@ def uninstall(root, dry_run):
     ensure_closed(root)
     latest = root / '.native-tray-backups/latest'
     if not latest.exists():
-        raise RuntimeError('No installer backup found. See the manual rollback instructions in README.md.')
+        raise RuntimeError('No installer backup found. Disable Native Tray, quit JD2, remove extensions/NativeTray.jar, and create tmp/invalidextensions.')
     name = latest.read_text().strip()
     if Path(name).name != name:
         raise RuntimeError('Invalid backup identifier')
@@ -128,7 +129,8 @@ def uninstall(root, dry_run):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('jd_root', nargs='?', type=Path, default=DEFAULT_ROOT)
+    parser.add_argument('jd_root', nargs='?', type=Path, default=DEFAULT_ROOT,
+                        help='JD2 directory (default: JD2_INSTALL_DIR, or the standard Flatpak directory)')
     parser.add_argument('--flatpak', action='store_true', help='grant narrow native tray access to the JD2 Flatpak')
     parser.add_argument('--uninstall', action='store_true')
     parser.add_argument('--dry-run', action='store_true')

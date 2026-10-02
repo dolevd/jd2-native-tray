@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-jd_dir=${1:-"$HOME/.var/app/org.jdownloader.JDownloader/data/jdownloader"}
-mkdir -p "$project_dir/.local-build/provided"
-for jd_jar in Core JDownloader; do
-    cp -- "$jd_dir/$jd_jar.jar" "$project_dir/.local-build/provided/$jd_jar.jar"
-done
-for jd_jar in JDUtils JDGUI jna jna_platform; do
-    cp -- "$jd_dir/libs/$jd_jar.jar" "$project_dir/.local-build/provided/$jd_jar.jar"
-done
+# Compatibility shortcut; the Maven build now resolves JD2_INSTALL_DIR itself.
+if (( $# > 1 )); then
+    printf 'Usage: %s [JD2 installation directory]\n' "$0" >&2
+    exit 2
+fi
+if (( $# == 1 )); then
+    JD2_INSTALL_DIR=$(cd -- "$1" && pwd)
+    export JD2_INSTALL_DIR
+fi
 cd -- "$project_dir"
-mvn -Dmaven.repo.local="$project_dir/.local-build/m2" -Djd.libs="$project_dir/.local-build/provided" package
+exec mvn -Dmaven.repo.local="$project_dir/.local-build/m2" package

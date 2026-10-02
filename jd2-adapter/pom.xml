@@ -18,42 +18,42 @@
       <artifactId>core</artifactId>
       <version>local</version>
       <scope>system</scope>
-      <systemPath>${jd.libs}/Core.jar</systemPath>
+      <systemPath>${jd.install.dir}/Core.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.jdownloader.local</groupId>
       <artifactId>launcher</artifactId>
       <version>local</version>
       <scope>system</scope>
-      <systemPath>${jd.libs}/JDownloader.jar</systemPath>
+      <systemPath>${jd.install.dir}/JDownloader.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.jdownloader.local</groupId>
       <artifactId>utils</artifactId>
       <version>local</version>
       <scope>system</scope>
-      <systemPath>${jd.libs}/JDUtils.jar</systemPath>
+      <systemPath>${jd.install.dir}/libs/JDUtils.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.jdownloader.local</groupId>
       <artifactId>gui</artifactId>
       <version>local</version>
       <scope>system</scope>
-      <systemPath>${jd.libs}/JDGUI.jar</systemPath>
+      <systemPath>${jd.install.dir}/libs/JDGUI.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.jdownloader.local</groupId>
       <artifactId>jna</artifactId>
       <version>local</version>
       <scope>system</scope>
-      <systemPath>${jd.libs}/jna.jar</systemPath>
+      <systemPath>${jd.install.dir}/libs/jna.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.jdownloader.local</groupId>
       <artifactId>jna-platform</artifactId>
       <version>local</version>
       <scope>system</scope>
-      <systemPath>${jd.libs}/jna_platform.jar</systemPath>
+      <systemPath>${jd.install.dir}/libs/jna_platform.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
@@ -114,6 +114,20 @@
     </plugins>
   </build>
   <properties>
-    <jd.libs>${maven.multiModuleProjectDirectory}/.local-build/provided</jd.libs>
+    <!-- JD2/AppWork's extension APIs are supplied by the installed application. -->
+    <jd.install.dir>${user.home}/.var/app/org.jdownloader.JDownloader/data/jdownloader</jd.install.dir>
   </properties>
+  <profiles>
+    <profile>
+      <id>custom-jd2-installation</id>
+      <activation>
+        <property>
+          <name>env.JD2_INSTALL_DIR</name>
+        </property>
+      </activation>
+      <properties>
+        <jd.install.dir>${env.JD2_INSTALL_DIR}</jd.install.dir>
+      </properties>
+    </profile>
+  </profiles>
 </project>
